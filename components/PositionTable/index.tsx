@@ -15,12 +15,14 @@ interface Props {
 
 export default function PositionTable({ showMyPos }: Props) {
 	const { address } = useAccount();
-	const { positions, loading } = useSelector((state: RootState) => state.positions);
+	const { list, loading } = useSelector((state: RootState) => state.positions);
 
 	const account = address || zeroAddress;
-	const matchingPositions = positions.filter((position) =>
+	const matchingPositions = list.filter((position) =>
 		showMyPos ? position.owner == account : position.owner != account && !position.denied && !position.closed
 	);
+
+	// return null;
 
 	return (
 		<Table>
