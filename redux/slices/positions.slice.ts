@@ -1,61 +1,18 @@
 import { createSlice, Dispatch } from '@reduxjs/toolkit';
-import { gql } from '@apollo/client';
-import { decodeBigIntCall } from '@utils';
 import client from '../../utils/apollo-client'; // Assuming you've set up Apollo Client
+import { gql } from '@apollo/client';
 import { Address, getAddress } from 'viem';
-
-// --------------------------------------------------------------------------------
-
-export type PositionQuery = {
-	position: Address;
-	owner: Address;
-	zchf: Address;
-	collateral: Address;
-	price: string;
-
-	created: number;
-	isOriginal: boolean;
-	isClone: boolean;
-	denied: boolean;
-	closed: boolean;
-	original: Address;
-
-	minimumCollateral: string;
-	annualInterestPPM: number;
-	reserveContribution: number;
-	start: string;
-	expiration: string;
-	challengePeriod: string;
-
-	zchfSymbol: string;
-	zchfDecimals: number;
-
-	collateralSymbol: string;
-	collateralDecimals: number;
-	collateralBalance: string;
-
-	limitForPosition: string;
-	limitForClones: string;
-	availableForPosition: string;
-	availableForClones: string;
-	minted: string;
-};
-
-export type PositionsState = {
-	error: string | null;
-	loading: boolean;
-	list: PositionQuery[];
-};
-
-export type DispatchPositionsLoading = {
-	type: string;
-	payload: Boolean;
-};
-
-export type DispatchPositionsList = {
-	type: string;
-	payload: PositionQuery[];
-};
+import { uniqueValues } from '@utils';
+import {
+	PositionsState,
+	PositionQuery,
+	DispatchAddressArray,
+	DispatchBoolean,
+	DispatchPositionQueryArray,
+	DispatchPositionQueryArray2,
+	ERC20Info,
+	DispatchERC20InfoArray,
+} from './positions.types';
 
 // --------------------------------------------------------------------------------
 
@@ -63,6 +20,15 @@ export const initialState: PositionsState = {
 	error: null,
 	loading: false,
 	list: [],
+
+	openPositions: [],
+	closedPositions: [],
+	deniedPositioins: [],
+	originalPositions: [],
+	openPositionsByOriginal: [],
+
+	collateralAddresses: [],
+	collateralERC20Infos: [],
 };
 
 // --------------------------------------------------------------------------------
@@ -81,9 +47,46 @@ export const slice = createSlice({
 			state.loading = action.payload;
 		},
 
-		// SET POSITIONS LIST
-		setPositionsList: (state, action: { payload: PositionQuery[] }) => {
+		// -------------------------------------
+		// SET LIST
+		setList: (state, action: { payload: PositionQuery[] }) => {
 			state.list = action.payload;
+		},
+
+		// SET OPEN POSITIONS
+		setOpenPositions: (state, action: { payload: PositionQuery[] }) => {
+			state.openPositions = action.payload;
+		},
+
+		// SET CLOSED POSITIONS
+		setClosedPositions: (state, action: { payload: PositionQuery[] }) => {
+			state.closedPositions = action.payload;
+		},
+
+		// SET DENIED POSITIONS
+		setDeniedPositions: (state, action: { payload: PositionQuery[] }) => {
+			state.deniedPositioins = action.payload;
+		},
+
+		// SET ORIGINAL POSITIONS
+		setOriginalPositions: (state, action: { payload: PositionQuery[] }) => {
+			state.originalPositions = action.payload;
+		},
+
+		// SET ORIGINAL POSITIONS
+		setOpenPositionsByOriginal: (state, action: { payload: PositionQuery[][] }) => {
+			state.openPositionsByOriginal = action.payload;
+		},
+
+		// -------------------------------------
+		// SET COLLATERAL ADDRESSES
+		setCollateralAddresses: (state, action: { payload: Address[] }) => {
+			state.collateralAddresses = action.payload;
+		},
+
+		// SET COLLATERAL ERC20 INFO
+		setCollateralERC20Infos: (state, action: { payload: ERC20Info[] }) => {
+			state.collateralERC20Infos = action.payload;
 		},
 	},
 });
@@ -92,94 +95,143 @@ export const positionReducer = slice.reducer;
 export const positionActions = slice.actions;
 
 // --------------------------------------------------------------------------------
-export const fetchPositionsList = () => async (dispatch: Dispatch<DispatchPositionsList | DispatchPositionsLoading>) => {
-	console.log('Loading [REDUX]: PositionsList');
-	dispatch(slice.actions.setLoading(true));
+export const fetchPositionsList =
+	() =>
+	async (
+		dispatch: Dispatch<
+			DispatchBoolean | DispatchPositionQueryArray | DispatchPositionQueryArray2 | DispatchAddressArray | DispatchERC20InfoArray
+		>
+	) => {
+		// ---------------------------------------------------------------
+		// Log, set loading to true
+		console.log('Loading [REDUX]: PositionsList');
+		dispatch(slice.actions.setLoading(true));
 
-	const { data } = await client.query({
-		query: gql`
-			query {
-				positions(orderBy: "availableForClones", orderDirection: "desc") {
-					items {
-						position
-						owner
-						zchf
-						collateral
-						price
+		// ---------------------------------------------------------------
+		// Query raw data from Ponder Indexer
+		const { data } = await client.query({
+			query: gql`
+				query {
+					positions(orderBy: "availableForClones", orderDirection: "desc") {
+						items {
+							position
+							owner
+							zchf
+							collateral
+							price
 
-						created
-						isOriginal
-						isClone
-						denied
-						closed
-						original
+							created
+							isOriginal
+							isClone
+							denied
+							closed
+							original
 
-						minimumCollateral
-						annualInterestPPM
-						reserveContribution
-						start
-						expiration
-						challengePeriod
+							minimumCollateral
+							annualInterestPPM
+							reserveContribution
+							start
+							expiration
+							challengePeriod
 
-						zchfSymbol
-						zchfDecimals
+							zchfName
+							zchfSymbol
+							zchfDecimals
 
-						collateralSymbol
-						collateralDecimals
-						collateralBalance
+							collateralName
+							collateralSymbol
+							collateralDecimals
+							collateralBalance
 
-						limitForPosition
-						limitForClones
-						availableForPosition
-						availableForClones
-						minted
+							limitForPosition
+							limitForClones
+							availableForPosition
+							availableForClones
+							minted
+						}
 					}
 				}
-			}
-		`,
-	});
-
-	const positions: PositionQuery[] = [];
-	if (data && data.positions) {
-		data.positions.items.forEach(async (p: PositionQuery) => {
-			// TODO: decodeBigIntCall / parseStringToBigInt???
-			positions.push({
-				position: getAddress(p.position),
-				owner: getAddress(p.owner),
-				zchf: getAddress(p.zchf),
-				collateral: getAddress(p.collateral),
-				price: p.price,
-
-				created: p.created,
-				isOriginal: p.isOriginal,
-				isClone: p.isClone,
-				denied: p.denied,
-				closed: p.closed,
-				original: getAddress(p.position),
-
-				minimumCollateral: p.minimumCollateral,
-				annualInterestPPM: p.annualInterestPPM,
-				reserveContribution: p.reserveContribution,
-				start: p.start,
-				expiration: p.expiration,
-				challengePeriod: p.challengePeriod,
-
-				zchfSymbol: p.zchfSymbol,
-				zchfDecimals: p.zchfDecimals,
-
-				collateralSymbol: p.collateralSymbol,
-				collateralDecimals: p.collateralDecimals,
-				collateralBalance: p.collateralBalance,
-
-				limitForPosition: p.limitForPosition,
-				limitForClones: p.limitForClones,
-				availableForPosition: p.availableForPosition,
-				availableForClones: p.availableForClones,
-				minted: p.minted,
-			});
+			`,
 		});
-	}
 
-	dispatch(slice.actions.setPositionsList(positions));
-	dispatch(slice.actions.setLoading(false));
-};
+		// ---------------------------------------------------------------
+		// Prepare and dispatch list: PositionQuery
+		// RAW data fetched from ponder backend indexer
+		const list: PositionQuery[] = [];
+		if (data && data.positions) {
+			data.positions.items.forEach(async (p: PositionQuery) => {
+				list.push({
+					position: getAddress(p.position),
+					owner: getAddress(p.owner),
+					zchf: getAddress(p.zchf),
+					collateral: getAddress(p.collateral),
+					price: p.price,
+
+					created: p.created,
+					isOriginal: p.isOriginal,
+					isClone: p.isClone,
+					denied: p.denied,
+					closed: p.closed,
+					original: getAddress(p.original),
+
+					minimumCollateral: p.minimumCollateral,
+					annualInterestPPM: p.annualInterestPPM,
+					reserveContribution: p.reserveContribution,
+					start: p.start,
+					expiration: p.expiration,
+					challengePeriod: p.challengePeriod,
+
+					zchfName: p.zchfName,
+					zchfSymbol: p.zchfSymbol,
+					zchfDecimals: p.zchfDecimals,
+
+					collateralName: p.collateralName,
+					collateralSymbol: p.collateralSymbol,
+					collateralDecimals: p.collateralDecimals,
+					collateralBalance: p.collateralBalance,
+
+					limitForPosition: p.limitForPosition,
+					limitForClones: p.limitForClones,
+					availableForPosition: p.availableForPosition,
+					availableForClones: p.availableForClones,
+					minted: p.minted,
+				});
+			});
+		}
+
+		dispatch(slice.actions.setList(list));
+
+		// ---------------------------------------------------------------
+		// filter positions and dispatch
+		const openPositions = list.filter((position) => !position.denied && !position.closed);
+		const closedPositioins = list.filter((position) => position.closed);
+		const deniedPositioins = list.filter((position) => position.denied);
+		const originalPositions = openPositions.filter((position) => position.isOriginal);
+		const openPositionsByOriginal = originalPositions.map((o) => openPositions.filter((p) => p.original == o.original));
+
+		dispatch(slice.actions.setOpenPositions(openPositions));
+		dispatch(slice.actions.setClosedPositions(closedPositioins));
+		dispatch(slice.actions.setDeniedPositions(deniedPositioins));
+		dispatch(slice.actions.setOriginalPositions(originalPositions));
+		dispatch(slice.actions.setOpenPositionsByOriginal(openPositionsByOriginal));
+
+		// ---------------------------------------------------------------
+		// filter collateral and ERC20 and dispatch
+		const collateralAddresses = openPositions.map((position) => position.collateral).filter(uniqueValues);
+		const collateralERC20Info = collateralAddresses.map((c): ERC20Info => {
+			const pos = originalPositions.filter((p) => p.collateral == c).at(0);
+			return {
+				address: c,
+				name: pos!.collateralName,
+				symbol: pos!.collateralSymbol,
+				decimals: pos!.collateralDecimals,
+			};
+		});
+
+		dispatch(slice.actions.setCollateralAddresses(collateralAddresses));
+		dispatch(slice.actions.setCollateralERC20Infos(collateralERC20Info));
+
+		// ---------------------------------------------------------------
+		// Finalizing, loading set to false
+		dispatch(slice.actions.setLoading(false));
+	};

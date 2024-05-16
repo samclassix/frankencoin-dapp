@@ -1,10 +1,10 @@
 // apollo-client.js
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
+import { URI_PONDERINDEXER } from '@utils';
 
 const client = new ApolloClient({
 	link: new HttpLink({
-		// uri: 'https://ponder3.frankencoin.com/',
-		uri: 'http://localhost:42069',
+		uri: URI_PONDERINDEXER,
 	}),
 	cache: new InMemoryCache(),
 });

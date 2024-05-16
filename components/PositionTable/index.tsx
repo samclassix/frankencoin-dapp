@@ -21,8 +21,8 @@ export default function PositionTable({ showMyPos }: Props) {
 	const matchingPositions = list.filter((position) =>
 		showMyPos ? position.owner == account : position.owner != account && !position.denied && !position.closed
 	);
-
-	// return null;
+	const originalPositions = matchingPositions.filter((positions) => positions.isOriginal);
+	const originalPositionsCat = originalPositions.map((org) => matchingPositions.filter((pos) => pos.original == org.original));
 
 	return (
 		<Table>
@@ -35,10 +35,10 @@ export default function PositionTable({ showMyPos }: Props) {
 							Loading...
 						</div>
 					</TableRowEmpty>
-				) : matchingPositions.length == 0 ? (
+				) : originalPositions.length == 0 ? (
 					<TableRowEmpty>{showMyPos ? "You don't have any positions." : 'There are no other positions yet.'}</TableRowEmpty>
 				) : (
-					matchingPositions.map((pos) => <PositionRow position={pos} key={pos.position} />)
+					originalPositions.map((pos) => <PositionRow position={pos} key={pos.position} />)
 				)}
 			</TableBody>
 		</Table>
