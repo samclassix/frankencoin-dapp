@@ -51,31 +51,37 @@ export const slice = createSlice({
 		// -------------------------------------
 		// SET LIST
 		setList: (state, action: { payload: PositionQuery[] }) => {
+			if (state.list.length >= action.payload.length) return;
 			state.list = action.payload;
 		},
 
 		// SET OPEN POSITIONS
 		setOpenPositions: (state, action: { payload: PositionQuery[] }) => {
+			if (state.openPositions.length >= action.payload.length) return;
 			state.openPositions = action.payload;
 		},
 
 		// SET CLOSED POSITIONS
 		setClosedPositions: (state, action: { payload: PositionQuery[] }) => {
+			if (state.closedPositions.length >= action.payload.length) return;
 			state.closedPositions = action.payload;
 		},
 
 		// SET DENIED POSITIONS
 		setDeniedPositions: (state, action: { payload: PositionQuery[] }) => {
+			if (state.deniedPositioins.length >= action.payload.length) return;
 			state.deniedPositioins = action.payload;
 		},
 
 		// SET ORIGINAL POSITIONS
 		setOriginalPositions: (state, action: { payload: PositionQuery[] }) => {
+			if (state.originalPositions.length >= action.payload.length) return;
 			state.originalPositions = action.payload;
 		},
 
 		// SET ORIGINAL POSITIONS
 		setOpenPositionsByOriginal: (state, action: { payload: PositionQuery[][] }) => {
+			if (state.openPositionsByOriginal.length >= action.payload.length) return;
 			state.openPositionsByOriginal = action.payload;
 		},
 
