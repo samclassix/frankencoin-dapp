@@ -1,5 +1,5 @@
 import { createSlice, Dispatch } from '@reduxjs/toolkit';
-import client from '../../utils/apollo-client'; // Assuming you've set up Apollo Client
+import client from '../../utils/apollo-client';
 import { gql } from '@apollo/client';
 import { Address, getAddress } from 'viem';
 import { uniqueValues } from '@utils';
@@ -29,6 +29,7 @@ export const initialState: PositionsState = {
 
 	collateralAddresses: [],
 	collateralERC20Infos: [],
+	mintERC20Infos: [],
 };
 
 // --------------------------------------------------------------------------------
@@ -81,18 +82,26 @@ export const slice = createSlice({
 		// -------------------------------------
 		// SET COLLATERAL ADDRESSES
 		setCollateralAddresses: (state, action: { payload: Address[] }) => {
+			if (state.collateralAddresses.length >= action.payload.length) return;
 			state.collateralAddresses = action.payload;
 		},
 
 		// SET COLLATERAL ERC20 INFO
 		setCollateralERC20Infos: (state, action: { payload: ERC20Info[] }) => {
+			if (state.collateralERC20Infos.length >= action.payload.length) return;
 			state.collateralERC20Infos = action.payload;
+		},
+
+		// SET Mint ERC20 INFO
+		setMintERC20Infos: (state, action: { payload: ERC20Info[] }) => {
+			if (state.mintERC20Infos.length >= action.payload.length) return;
+			state.mintERC20Infos = action.payload;
 		},
 	},
 });
 
-export const positionReducer = slice.reducer;
-export const positionActions = slice.actions;
+export const reducer = slice.reducer;
+export const actions = slice.actions;
 
 // --------------------------------------------------------------------------------
 export const fetchPositionsList =
@@ -217,7 +226,16 @@ export const fetchPositionsList =
 
 		// ---------------------------------------------------------------
 		// filter collateral and ERC20 and dispatch
+		// TODO: Change hardcoded ZCHF Info (zchfERC20Info), if adding additional currencies dynamically is needed.
 		const collateralAddresses = openPositions.map((position) => position.collateral).filter(uniqueValues);
+		const mintERC20Infos: ERC20Info[] = [
+			{
+				address: originalPositions.at(0)!.zchf,
+				name: originalPositions.at(0)!.zchfName,
+				symbol: originalPositions.at(0)!.zchfSymbol,
+				decimals: originalPositions.at(0)!.zchfDecimals,
+			},
+		];
 		const collateralERC20Info = collateralAddresses.map((c): ERC20Info => {
 			const pos = originalPositions.filter((p) => p.collateral == c).at(0);
 			return {
@@ -230,6 +248,7 @@ export const fetchPositionsList =
 
 		dispatch(slice.actions.setCollateralAddresses(collateralAddresses));
 		dispatch(slice.actions.setCollateralERC20Infos(collateralERC20Info));
+		dispatch(slice.actions.setMintERC20Infos(mintERC20Infos));
 
 		// ---------------------------------------------------------------
 		// Finalizing, loading set to false

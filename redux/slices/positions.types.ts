@@ -14,6 +14,7 @@ export type PositionsState = {
 
 	collateralAddresses: Address[];
 	collateralERC20Infos: ERC20Info[];
+	mintERC20Infos: ERC20Info[];
 };
 
 // --------------------------------------------------------------------------------
@@ -55,7 +56,7 @@ export type PositionQuery = {
 };
 
 export type ERC20Info = {
-	address: string;
+	address: Address;
 	name: string;
 	symbol: string;
 	decimals: number;

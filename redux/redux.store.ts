@@ -2,12 +2,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import { combineReducers } from 'redux';
 
 // splices
-import { positionReducer } from './slices/positions.slice';
+import { reducer as positionReducer } from './slices/positions.slice';
+import { reducer as pricesReducer } from './slices/prices.slice';
 
 // store with combined reducers
 export const store = configureStore({
 	reducer: combineReducers({
 		positions: positionReducer,
+		prices: pricesReducer,
 	}),
 });
 
