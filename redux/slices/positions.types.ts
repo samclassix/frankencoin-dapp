@@ -11,6 +11,7 @@ export type PositionsState = {
 	deniedPositioins: PositionQuery[];
 	originalPositions: PositionQuery[];
 	openPositionsByOriginal: PositionQuery[][];
+	openPositionsByCollateral: PositionQuery[][];
 
 	collateralAddresses: Address[];
 	collateralERC20Infos: ERC20Info[];

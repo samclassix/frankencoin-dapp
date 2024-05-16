@@ -1,34 +1,27 @@
 import { useSelector } from 'react-redux';
 import { RootState } from '../../redux/redux.store';
-import { PositionQuery } from '@hooks';
-import Box from '@mui/material/Box';
-import Tab from '@mui/material/Tab';
-import TabContext from '@mui/lab/TabContext';
-import TabList from '@mui/lab/TabList';
-import TabPanel from '@mui/lab/TabPanel';
 import { Card, CardContent, Grid, SvgIcon, Typography } from '@mui/material';
-import CircularProgress, { CircularProgressProps } from '@mui/material/CircularProgress';
-
-function uniqueValues(value: string, index: number, array: string[]) {
-	return array.indexOf(value) === index;
-}
+import { Address } from 'viem';
 
 export default function TotalValueLocked() {
-	const { list, loading } = useSelector((state: RootState) => state.positions);
+	const { loading, openPositionsByCollateral } = useSelector((state: RootState) => state.positions);
+	const { coingecko } = useSelector((state: RootState) => state.prices);
 
-	const matchingPositions = list.filter((position) => !position.denied && !position.closed);
-	const originalPositions = matchingPositions.filter((positions) => positions.isOriginal);
-	const originalPositionsCategories = originalPositions.map((org) => matchingPositions.filter((pos) => pos.original == org.original));
-	const collateralCat = matchingPositions.map((pos) => pos.collateral).filter(uniqueValues);
-	const collateralPositionCat = collateralCat.map((cat) => matchingPositions.filter((pos) => pos.collateral == cat));
+	if (openPositionsByCollateral.length == 0 || Object.keys(coingecko).length == 0) return <>Loadinng...</>;
 
-	const collateralStats = collateralPositionCat.map((posCat) => {
-		const org = posCat.at(0);
+	const stats = [];
+	for (let positions of openPositionsByCollateral) {
+		const original = positions.at(0);
+		const collateral = coingecko[original!.collateral.toLowerCase() as Address];
+		const mint = coingecko[original!.zchf.toLowerCase() as Address];
+
+		if (!collateral || !mint) continue;
+
 		let balance = 0;
 		let limitForClones = 0;
 		let availableForClones = 0;
 
-		for (let pos of posCat) {
+		for (let pos of positions) {
 			balance += parseInt(pos.collateralBalance);
 			if (pos.isOriginal) {
 				limitForClones += parseInt(pos.limitForClones);
@@ -36,26 +29,38 @@ export default function TotalValueLocked() {
 			}
 		}
 
-		return {
-			original: org,
-			originals: posCat.filter((pos) => pos.isOriginal),
-			clones: posCat.filter((pos) => pos.isClone),
+		balance = balance / 10 ** collateral.decimals;
+		const valueLocked = Math.round(balance * collateral.price.usd);
+		const highestZCHFPrice =
+			Math.round(Math.max(...positions.map((p) => (parseInt(p.price) * 100) / 10 ** (36 - p.collateralDecimals)))) / 100;
+
+		const collateralizedPct = Math.round((collateral.price.usd / (highestZCHFPrice * mint.price.usd)) * 10000) / 100;
+
+		stats.push({
+			original,
+			originals: positions.filter((pos) => pos.isOriginal),
+			clones: positions.filter((pos) => pos.isClone),
 			balance,
+			collateral,
+			mint,
 			limitForClones,
 			availableForClones,
-		};
-	});
+			valueLocked,
+			highestZCHFPrice,
+			collateralizedPct,
+		});
+	}
 
 	return (
 		<Grid container spacing={2} sx={{ justifyContent: 'center' }}>
-			{collateralStats.map((stats) => {
-				const name = stats?.original?.collateralName;
-				const vl = stats?.balance / 10 ** stats?.original!.collateralDecimals;
-				const prs = stats.originals.map(
+			{stats.map((stat) => {
+				// const pr = stats?.priceQuote ? stats.priceQuote.usd : undefined;
+				// console.log(stat);
+				const prs = stat.originals.map(
 					(pos) => Math.round((parseInt(pos.price) * 100) / 10 ** (36 - pos.collateralDecimals)) / 100
 				);
-				const av = Math.floor(stats!.availableForClones / 10 ** stats?.original!.zchfDecimals);
-				const lm = Math.floor(stats!.limitForClones / 10 ** stats?.original!.zchfDecimals);
+				const av = Math.floor(stat!.availableForClones / 10 ** stat?.original!.zchfDecimals);
+				const lm = Math.floor(stat!.limitForClones / 10 ** stat?.original!.zchfDecimals);
 				const pct = Math.floor((1 - av / lm) * 10000) / 100;
 
 				return (
@@ -63,29 +68,50 @@ export default function TotalValueLocked() {
 						alignContent={'center'}
 						item
 						xs={2}
-						key={stats?.original?.collateral}
+						key={stat?.original?.collateral}
 						sx={{
 							bgcolor: '#222',
 							boxShadow: 10,
 							borderRadius: 5,
-							minWidth: 300,
+							minWidth: '80%',
 							minHeight: 200,
 							p: 5,
 							m: 2,
 						}}
 					>
 						<Typography align="center" variant="h5">
-							{name}
+							{stat.collateral.name}
 						</Typography>
+
 						<Typography>
-							Value Locked: {vl} {stats.original?.collateralSymbol}
+							Balance: {stat.balance} {stat.collateral.symbol}
 						</Typography>
-						<Typography>Originals: {stats?.originals.length}</Typography>
-						<Typography>Clones: {stats?.clones.length}</Typography>
+						<Typography>Originals: {stat.originals.length}</Typography>
+						<Typography>Clones: {stat.clones.length}</Typography>
+						<Typography>-</Typography>
+
+						<Typography>All prices for all original positions:</Typography>
 						{prs ? prs.map((pr) => <Typography key={Math.random() * 10 ** 8}>Price: {pr} ZCHF</Typography>) : null}
+						<Typography>Price (coingecko): {stat.mint.price.usd} USD/ZCHF</Typography>
+						<Typography>
+							Price (coingecko): {stat.collateral.price.usd} USD/{stat.collateral.symbol}
+						</Typography>
+						<Typography>Price (highest): {stat.highestZCHFPrice} ZCHF</Typography>
+						<Typography>
+							Price (highest): {stat.highestZCHFPrice * stat.mint.price.usd} USD/{stat.collateral.symbol}
+						</Typography>
+						<Typography>-</Typography>
+
+						<Typography>Value Locked (coingecko): {stat.valueLocked} USD</Typography>
+						<Typography>Value Locked (ZCHF): {Math.round(stat.balance * stat.highestZCHFPrice)} ZCHF</Typography>
+						<Typography>-</Typography>
+
 						<Typography>Av. for cloans: {av} ZCHF</Typography>
 						<Typography>Limit mint: {lm} ZCHF</Typography>
+						<Typography>-</Typography>
+
 						<Typography>Pct minted: {pct} %</Typography>
+						<Typography>Pct collateralized: {stat.collateralizedPct} %</Typography>
 					</Grid>
 				);
 			})}

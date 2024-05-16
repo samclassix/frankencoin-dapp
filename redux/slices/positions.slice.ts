@@ -26,6 +26,7 @@ export const initialState: PositionsState = {
 	deniedPositioins: [],
 	originalPositions: [],
 	openPositionsByOriginal: [],
+	openPositionsByCollateral: [],
 
 	collateralAddresses: [],
 	collateralERC20Infos: [],
@@ -79,10 +80,16 @@ export const slice = createSlice({
 			state.originalPositions = action.payload;
 		},
 
-		// SET ORIGINAL POSITIONS
+		// SET OPEN POSITIONS BY ORIGINAL
 		setOpenPositionsByOriginal: (state, action: { payload: PositionQuery[][] }) => {
 			if (state.openPositionsByOriginal.length >= action.payload.length) return;
 			state.openPositionsByOriginal = action.payload;
+		},
+
+		// SET OPEN POSITIONS BY COLLATERAL
+		setOpenPositionsByCollateral: (state, action: { payload: PositionQuery[][] }) => {
+			if (state.openPositionsByCollateral.length >= action.payload.length) return;
+			state.openPositionsByCollateral = action.payload;
 		},
 
 		// -------------------------------------
@@ -219,21 +226,24 @@ export const fetchPositionsList =
 		// ---------------------------------------------------------------
 		// filter positions and dispatch
 		const openPositions = list.filter((position) => !position.denied && !position.closed);
+		const collateralAddresses = openPositions.map((position) => position.collateral).filter(uniqueValues);
+
 		const closedPositioins = list.filter((position) => position.closed);
 		const deniedPositioins = list.filter((position) => position.denied);
 		const originalPositions = openPositions.filter((position) => position.isOriginal);
 		const openPositionsByOriginal = originalPositions.map((o) => openPositions.filter((p) => p.original == o.original));
+		const openPositionsByCollateral = collateralAddresses.map((con) => openPositions.filter((position) => position.collateral == con));
 
 		dispatch(slice.actions.setOpenPositions(openPositions));
 		dispatch(slice.actions.setClosedPositions(closedPositioins));
 		dispatch(slice.actions.setDeniedPositions(deniedPositioins));
 		dispatch(slice.actions.setOriginalPositions(originalPositions));
 		dispatch(slice.actions.setOpenPositionsByOriginal(openPositionsByOriginal));
+		dispatch(slice.actions.setOpenPositionsByCollateral(openPositionsByCollateral));
 
 		// ---------------------------------------------------------------
 		// filter collateral and ERC20 and dispatch
 		// TODO: Change hardcoded ZCHF Info (zchfERC20Info), if adding additional currencies dynamically is needed.
-		const collateralAddresses = openPositions.map((position) => position.collateral).filter(uniqueValues);
 		const mintERC20Infos: ERC20Info[] = [
 			{
 				address: originalPositions.at(0)!.zchf,
